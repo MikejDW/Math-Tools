@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analysis Statement Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Load and configure MathJax -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            svg: {
+                fontCache: 'global'
+            }
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" id="MathJax-script" async></script>
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Ensure the containers have a minimum height to prevent layout shifts */
+        #statement-container, #negation-steps-container {
+            min-height: 120px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-4xl mx-auto text-center">
+        <header class="mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 dark:text-white">Analysis Definition Generator</h1>
+            <p class="text-lg text-gray-600 dark:text-gray-300 mt-2">Generate a random definition, reveal its negation, and toggle between symbolic and English views.</p>
+        </header>
+
+        <!-- Container for the generated statement -->
+        <div id="statement-container" class="bg-white dark:bg-gray-600 rounded-lg shadow-xl p-6 md:p-8 min-h-[150px] flex items-center justify-center text-xl md:text-2xl mb-4 overflow-x-auto">
+            <!-- Statement will be injected here -->
+        </div>
+
+        <!-- Negation Steps Container -->
+        <div id="negation-container" class="hidden">
+            <h2 class="text-2xl font-semibold text-gray-700 dark:text-gray-200 mb-2">Negation Steps:</h2>
+            <div id="negation-steps-container" class="bg-gray-100 dark:bg-gray-700 rounded-lg shadow-inner p-6 md:p-8 flex items-center justify-center text-xl md:text-2xl mb-4 overflow-x-auto">
+                <!-- Negation steps will appear here -->
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex flex-wrap justify-center gap-4">
+             <button id="generate-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition transform hover:scale-105">
+                Generate New Problem
+            </button>
+            <button id="toggle-view-btn" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition transform hover:scale-105">
+                Show in English
+            </button>
+            <button id="reveal-negation-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition transform hover:scale-105">
+                Reveal Negation
+            </button>
+            <button id="next-step-btn" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition transform hover:scale-105 hidden">
+                Next Step
+            </button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // DOM Elements
+            const statementContainer = document.getElementById('statement-container');
+            const negationContainer = document.getElementById('negation-container');
+            const negationStepsContainer = document.getElementById('negation-steps-container');
+            const generateBtn = document.getElementById('generate-btn');
+            const toggleViewBtn = document.getElementById('toggle-view-btn');
+            const revealBtn = document.getElementById('reveal-negation-btn');
+            const nextStepBtn = document.getElementById('next-step-btn');
+
+            // State
+            let currentTemplate = null;
+            let currentParams = null;
+            let negationStep = 0;
+            let isEnglishView = false;
+            
+            // --- Pools of variables ---
+            const epsilons = ['\\epsilon', '\\delta', '\\gamma'];
+            const deltas = ['\\delta', '\\gamma', '\\eta'];
+            const indices = ['N', 'M', 'K'];
+            const variables = ['x', 'y', 'z'];
+            const points = ['c', 'a', 'p'];
+            const functions = ['f', 'g', 'h'];
+            const sequences = ['a_n', 'b_n', 'x_n'];
+            const limits = ['L', 'A', 'B'];
+
+            // --- Statement Templates with Symbolic and English versions ---
+            const templates = [
+                {
+                    name: "Limit of a Sequence",
+                    symbolic: {
+                        template: (p) => `\\forall ${p.epsilon} > 0, \\exists ${p.index} \\in \\mathbb{N} \\text{ s.t. } \\forall n \\geq ${p.index}, |${p.sequence} - ${p.limit}| < ${p.epsilon}`,
+                        negation: (p) => [
+                            `\\neg \\left( \\forall ${p.epsilon} > 0, \\exists ${p.index} \\in \\mathbb{N} \\text{ s.t. } \\forall n \\geq ${p.index}, |${p.sequence} - ${p.limit}| < ${p.epsilon} \\right)`,
+                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\neg \\left( \\exists ${p.index} \\in \\mathbb{N} \\text{ s.t. } \\forall n \\geq ${p.index}, |${p.sequence} - ${p.limit}| < ${p.epsilon} \\right)`,
+                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\forall ${p.index} \\in \\mathbb{N}, \\neg \\left( \\forall n \\geq ${p.index}, |${p.sequence} - ${p.limit}| < ${p.epsilon} \\right)`,
+                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\forall ${p.index} \\in \\mathbb{N}, \\exists n \\geq ${p.index} \\text{ s.t. } \\neg \\left( |${p.sequence} - ${p.limit}| < ${p.epsilon} \\right)`,
+                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\forall ${p.index} \\in \\mathbb{N}, \\exists n \\geq ${p.index} \\text{ s.t. } |${p.sequence} - ${p.limit}| \\geq ${p.epsilon}`
+                        ]
+                    },
+                    english: {
+                        template: (p) => `For every $${p.epsilon} > 0$, there exists a natural number $${p.index} \\in \\mathbb{N}$ such that for all $n \\geq ${p.index}$, $|${p.sequence} - ${p.limit}| < ${p.epsilon}$.`,
+                        negation: (p) => [
+                            `It is not the case that (for every $${p.epsilon} > 0$, there exists a natural number $${p.index} \\in \\mathbb{N}$ such that for all $n \\geq ${p.index}$, $|${p.sequence} - ${p.limit}| < ${p.epsilon}$).`,
+                            `There exists an $${p.epsilon} > 0$ such that it is not the case that (there exists a natural number $${p.index} \\in \\mathbb{N}$ such that for all $n \\geq ${p.index}$, $|${p.sequence} - ${p.limit}| < ${p.epsilon}$).`,
+                            `There exists an $${p.epsilon} > 0$ such that for all natural numbers $${p.index} \\in \\mathbb{N}$, it is not the case that (for all $n \\geq ${p.index}$, $|${p.sequence} - ${p.limit}| < ${p.epsilon}$).`,
+                            `There exists an $${p.epsilon} > 0$ such that for all natural numbers $${p.index} \\in \\mathbb{N}$, there exists an $n \\geq ${p.index}$ such that it is not the case that ($|${p.sequence} - ${p.limit}| < ${p.epsilon}$).`,
+                            `There exists an $${p.epsilon} > 0$ such that for all natural numbers $${p.index} \\in \\mathbb{N}$, there exists an $n \\geq ${p.index}$ such that $|${p.sequence} - ${p.limit}| \\geq ${p.epsilon}$.`
+                        ]
+                    }
+                },
+                {
+                    name: "Continuity at a Point",
+                    symbolic: {
+                        template: (p) => `\\forall ${p.epsilon} > 0, \\exists ${p.delta} > 0 \\text{ s.t. } \\forall ${p.variable}, |${p.variable} - ${p.point}| < ${p.delta} \\implies |${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon}`,
+                        negation: (p) => [
+                            `\\neg \\left( \\forall ${p.epsilon} > 0, \\exists ${p.delta} > 0 \\text{ s.t. } \\forall ${p.variable}, |${p.variable} - ${p.point}| < ${p.delta} \\implies |${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon} \\right)`,
+                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\neg \\left( \\exists ${p.delta} > 0 \\text{ s.t. } \\forall ${p.variable}, |${p.variable} - ${p.point}| < ${p.delta} \\implies |${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon} \\right)`,
+                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\forall ${p.delta} > 0, \\neg \\left( \\forall ${p.variable}, |${p.variable} - ${p.point}| < ${p.delta} \\implies |${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon} \\right)`,
+                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\forall ${p.delta} > 0, \\exists ${p.variable} \\text{ s.t. } \\neg \\left( |${p.variable} - ${p.point}| < ${p.delta} \\implies |${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon} \\right)`,
+                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\forall ${p.delta} > 0, \\exists ${p.variable} \\text{ s.t. } |${p.variable} - ${p.point}| < ${p.delta} \\land \\neg \\left( |${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon} \\right)`,
+                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\forall ${p.delta} > 0, \\exists ${p.variable} \\text{ s.t. } |${p.variable} - ${p.point}| < ${p.delta} \\land |${p.func}(${p.variable}) - ${p.func}(${p.point})| \\geq ${p.epsilon}`
+                        ]
+                    },
+                    english: {
+                        template: (p) => `For every $${p.epsilon} > 0$, there exists a $${p.delta} > 0$ such that for all $${p.variable}$, if $|${p.variable} - ${p.point}| < ${p.delta}$ then $|${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon}$.`,
+                        negation: (p) => [
+                            `It is not the case that (for every $${p.epsilon} > 0$, there exists a $${p.delta} > 0$ such that for all $${p.variable}$, if $|${p.variable} - ${p.point}| < ${p.delta}$ then $|${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon}$).`,
+                            `There exists an $${p.epsilon} > 0$ such that it is not the case that (there exists a $${p.delta} > 0$ such that for all $${p.variable}$, if $|${p.variable} - ${p.point}| < ${p.delta}$ then $|${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon}$).`,
+                            `There exists an $${p.epsilon} > 0$ such that for all $${p.delta} > 0$, it is not the case that (for all $${p.variable}$, if $|${p.variable} - ${p.point}| < ${p.delta}$ then $|${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon}$).`,
+                            `There exists an $${p.epsilon} > 0$ such that for all $${p.delta} > 0$, there exists an $${p.variable}$ such that it is not the case that (if $|${p.variable} - ${p.point}| < ${p.delta}$ then $|${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon}$).`,
+                            `There exists an $${p.epsilon} > 0$ such that for all $${p.delta} > 0$, there exists an $${p.variable}$ such that $|${p.variable} - ${p.point}| < ${p.delta}$ and it is not the case that ($|${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon}$).`,
+                            `There exists an $${p.epsilon} > 0$ such that for all $${p.delta} > 0$, there exists an $${p.variable}$ such that $|${p.variable} - ${p.point}| < ${p.delta}$ and $|${p.func}(${p.variable}) - ${p.func}(${p.point})| \\geq ${p.epsilon}$.`
+                        ]
+                    }
+                },
+                {
+                    name: "Uniform Continuity",
+                    symbolic: {
+                        template: (p) => `\\forall ${p.epsilon} > 0, \\exists ${p.delta} > 0 \\text{ s.t. } \\forall ${p.var1}, ${p.var2}, |${p.var1} - ${p.var2}| < ${p.delta} \\implies |${p.func}(${p.var1}) - ${p.func}(${p.var2})| < ${p.epsilon}`,
+                        negation: (p) => [
+                            `\\neg \\left( \\forall ${p.epsilon} > 0, \\exists ${p.delta} > 0 \\text{ s.t. } \\forall ${p.var1}, ${p.var2}, |${p.var1} - ${p.var2}| < ${p.delta} \\implies |${p.func}(${p.var1}) - ${p.func}(${p.var2})| < ${p.epsilon} \\right)`,
+                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\neg \\left( \\exists ${p.delta} > 0 \\text{ s.t. } \\forall ${p.var1}, ${p.var2}, |${p.var1} - ${p.var2}| < ${p.delta} \\implies |${p.func}(${p.var1}) - ${p.func}(${p.var2})| < ${p.epsilon} \\right)`,
+                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\forall ${p.delta} > 0, \\neg \\left( \\forall ${p.var1}, ${p.var2}, |${p.var1} - ${p.var2}| < ${p.delta} \\implies |${p.func}(${p.var1}) - ${p.func}(${p.var2})| < ${p.epsilon} \\right)`,
+                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\forall ${p.delta} > 0, \\exists ${p.var1}, ${p.var2} \\text{ s.t. } \\neg \\left( |${p.var1} - ${p.var2}| < ${p.delta} \\implies |${p.func}(${p.var1}) - ${p.func}(${p.var2})| < ${p.epsilon} \\right)`,
+                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\forall ${p.delta} > 0, \\exists ${p.var1}, ${p.var2} \\text{ s.t. } |${p.var1} - ${p.var2}| < ${p.delta} \\land |${p.func}(${p.var1}) - ${p.func}(${p.var2})| \\geq ${p.epsilon}`
+                        ]
+                    },
+                    english: {
+                        template: (p) => `For every $${p.epsilon} > 0$, there exists a $${p.delta} > 0$ such that for all $${p.var1}, ${p.var2}$, if $|${p.var1} - ${p.var2}| < ${p.delta}$ then $|${p.func}(${p.var1}) - ${p.func}(${p.var2})| < ${p.epsilon}$.`,
+                        negation: (p) => [
+                            `It is not the case that (for every $${p.epsilon} > 0$, there exists a $${p.delta} > 0$ such that for all $${p.var1}, ${p.var2}$, if $|${p.var1} - ${p.var2}| < ${p.delta}$ then $|${p.func}(${p.var1}) - ${p.func}(${p.var2})| < ${p.epsilon}$).`,
+                            `There exists an $${p.epsilon} > 0$ such that it is not the case that (there exists a $${p.delta} > 0$ such that for all $${p.var1}, ${p.var2}$, if $|${p.var1} - ${p.var2}| < ${p.delta}$ then $|${p.func}(${p.var1}) - ${p.func}(${p.var2})| < ${p.epsilon}$).`,
+                            `There exists an $${p.epsilon} > 0$ such that for all $${p.delta} > 0$, it is not the case that (for all $${p.var1}, ${p.var2}$, if $|${p.var1} - ${p.var2}| < ${p.delta}$ then $|${p.func}(${p.var1}) - ${p.func}(${p.var2})| < ${p.epsilon}$).`,
+                            `There exists an $${p.epsilon} > 0$ such that for all $${p.delta} > 0$, there exist $${p.var1}, ${p.var2}$ such that it is not the case that (if $|${p.var1} - ${p.var2}| < ${p.delta}$ then $|${p.func}(${p.var1}) - ${p.func}(${p.var2})| < ${p.epsilon}$).`,
+                            `There exists an $${p.epsilon} > 0$ such that for all $${p.delta} > 0$, there exist $${p.var1}, ${p.var2}$ such that $|${p.var1} - ${p.var2}| < ${p.delta}$ and $|${p.func}(${p.var1}) - ${p.func}(${p.var2})| \\geq ${p.epsilon}$.`
+                        ]
+                    }
+                }
+            ];
+
+            const choice = (arr) => arr[Math.floor(Math.random() * arr.length)];
+            
+            function updateDisplay() {
+                if (!currentTemplate) return;
+
+                const viewMode = isEnglishView ? 'english' : 'symbolic';
+                
+                // Helper function to apply styles and content
+                const updateContainer = (container, text) => {
+                    if (isEnglishView) {
+                        container.innerHTML = `<p>${text}</p>`;
+                        container.classList.add('justify-start', 'text-left');
+                        container.classList.remove('justify-center', 'text-center');
+                    } else {
+                        container.innerHTML = `$$${text}$$`;
+                        container.classList.remove('justify-start', 'text-left');
+                        container.classList.add('justify-center', 'text-center');
+                    }
+                };
+
+                // Update main statement
+                const statementText = currentTemplate[viewMode].template(currentParams);
+                updateContainer(statementContainer, statementText);
+
+                // Update negation statement if visible
+                if (!negationContainer.classList.contains('hidden')) {
+                    const negationSteps = currentTemplate[viewMode].negation(currentParams);
+                    if (negationStep < negationSteps.length) {
+                        const stepText = negationSteps[negationStep];
+                        updateContainer(negationStepsContainer, stepText);
+                    }
+                }
+                
+                toggleViewBtn.textContent = isEnglishView ? 'Show Symbolic' : 'Show in English';
+
+                // Always re-typeset the math content
+                if (window.MathJax) {
+                    MathJax.typesetPromise([statementContainer, negationStepsContainer]).catch((err) => console.log(err.message));
+                }
+            }
+
+
+            function generateNewProblem() {
+                currentTemplate = choice(templates);
+                const var1_choice = choice(variables);
+                currentParams = {
+                    epsilon: choice(epsilons),
+                    delta: choice(deltas),
+                    index: choice(indices),
+                    variable: choice(variables),
+                    var1: var1_choice,
+                    var2: choice(variables.filter(v => v !== var1_choice)),
+                    point: choice(points),
+                    func: choice(functions),
+                    sequence: choice(sequences),
+                    limit: choice(limits)
+                };
+
+                negationStep = 0;
+                negationContainer.classList.add('hidden');
+                negationStepsContainer.innerHTML = '';
+                revealBtn.classList.remove('hidden');
+                nextStepBtn.classList.add('hidden');
+                nextStepBtn.disabled = false;
+                nextStepBtn.textContent = 'Next Step';
+                
+                updateDisplay();
+            }
+
+            function handleRevealNegation() {
+                negationContainer.classList.remove('hidden');
+                revealBtn.classList.add('hidden');
+                nextStepBtn.classList.remove('hidden');
+                updateDisplay();
+            }
+
+            function handleNextStep() {
+                // Use symbolic length as the source of truth
+                const negationSteps = currentTemplate.symbolic.negation(currentParams);
+                if (negationStep < negationSteps.length - 1) {
+                    negationStep++;
+                    if (negationStep === negationSteps.length - 1) {
+                        nextStepBtn.textContent = 'Final Answer';
+                        nextStepBtn.disabled = true;
+                    }
+                }
+                updateDisplay();
+            }
+
+            function handleToggleView() {
+                isEnglishView = !isEnglishView;
+                updateDisplay();
+            }
+
+            // --- Main Execution ---
+            MathJax.startup.promise.then(() => {
+                generateBtn.addEventListener('click', generateNewProblem);
+                toggleViewBtn.addEventListener('click', handleToggleView);
+                revealBtn.addEventListener('click', handleRevealNegation);
+                nextStepBtn.addEventListener('click', handleNextStep);
+                
+                generateNewProblem();
+            });
+        });
+    </script>
+</body>
+</html>
