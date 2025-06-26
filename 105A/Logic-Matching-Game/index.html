@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logical Equivalence Matching Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Card styles */
+        .card {
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        .card.selected {
+            background-color: #3b82f6; /* bg-blue-500 */
+            color: white;
+            transform: scale(1.05);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+        }
+
+        /* Animation for incorrect matches */
+        .shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        /* Animation for correct matches */
+        .disappear {
+            animation: disappear 0.5s ease-out forwards;
+        }
+
+        @keyframes disappear {
+            from {
+                opacity: 1;
+                transform: scale(1);
+            }
+            to {
+                opacity: 0;
+                transform: scale(0.5);
+            }
+        }
+        
+        /* Modal styles */
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <div id="game-container" class="w-full max-w-4xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 dark:text-white">Logical Equivalence Challenge</h1>
+            <p class="text-lg text-gray-600 dark:text-gray-300 mt-2">Click on a negated statement and then on its equivalent expression to make a pair.</p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+                <h2 class="text-2xl font-semibold mb-4 text-center text-red-500">Negated Statements</h2>
+                <ul id="negated-statements" class="space-y-4">
+                    <!-- Statements will be injected here by JavaScript -->
+                </ul>
+            </div>
+            <div>
+                <h2 class="text-2xl font-semibold mb-4 text-center text-green-500">Equivalent Statements</h2>
+                <ul id="equivalent-statements" class="space-y-4">
+                    <!-- Statements will be injected here by JavaScript -->
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Win Message Modal -->
+    <div id="win-modal" class="modal-backdrop hidden">
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl p-8 max-w-sm w-full text-center">
+        <h2 class="text-3xl font-bold text-green-500 mb-4">Congratulations!</h2>
+        <p class="text-lg text-gray-700 dark:text-gray-300 mb-6">You've successfully matched all the logical equivalences.</p>
+        <button id="play-again-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg w-full">Play Again</button>
+      </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const logicalPairs = [
+                { id: 1, negated: '¬(P ∧ Q)', equivalent: '¬P ∨ ¬Q' },
+                { id: 2, negated: '¬(P ∨ Q)', equivalent: '¬P ∧ ¬Q' },
+                { id: 3, negated: '¬(P → Q)', equivalent: 'P ∧ ¬Q' },
+                { id: 6, negated: 'P → Q', equivalent: '¬P ∨ Q' },
+                { id: 7, negated: '¬(P ↔ Q)', equivalent: '(P ∧ ¬Q) ∨ (Q ∧ ¬P)' }
+            ];
+
+            const negatedList = document.getElementById('negated-statements');
+            const equivalentList = document.getElementById('equivalent-statements');
+            const gameContainer = document.getElementById('game-container');
+            const winModal = document.getElementById('win-modal');
+            const playAgainBtn = document.getElementById('play-again-btn');
+
+            let selectedNegated = null;
+            let selectedEquivalent = null;
+            let remainingPairs = logicalPairs.length;
+
+            /**
+             * Shuffles an array in place.
+             * @param {Array} array The array to shuffle.
+             * @returns {Array} The shuffled array.
+             */
+            function shuffle(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            }
+
+            /**
+             * Creates and appends a list item to a given list.
+             * @param {string} text The text content of the card.
+             * @param {number} pairId The ID of the logical pair.
+             * @param {HTMLElement} listElement The UL element to append to.
+             * @param {string} type 'negated' or 'equivalent'.
+             */
+            function createCard(text, pairId, listElement, type) {
+                const li = document.createElement('li');
+                li.className = 'card bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md text-center text-lg font-mono';
+                li.textContent = text;
+                li.dataset.pairId = pairId;
+                li.dataset.type = type;
+                listElement.appendChild(li);
+            }
+            
+            /**
+             * Initializes and starts the game.
+             */
+            function initGame() {
+                // Clear existing lists and reset state
+                negatedList.innerHTML = '';
+                equivalentList.innerHTML = '';
+                selectedNegated = null;
+                selectedEquivalent = null;
+                remainingPairs = logicalPairs.length;
+                winModal.classList.add('hidden');
+
+                // Shuffle pairs and create cards
+                const shuffledNegated = shuffle([...logicalPairs]);
+                const shuffledEquivalent = shuffle([...logicalPairs]);
+
+                shuffledNegated.forEach(pair => {
+                    createCard(pair.negated, pair.id, negatedList, 'negated');
+                });
+
+                shuffledEquivalent.forEach(pair => {
+                    createCard(pair.equivalent, pair.id, equivalentList, 'equivalent');
+                });
+            }
+
+
+            /**
+             * Handles the click event on a card.
+             * @param {Event} e The click event.
+             */
+            function handleCardClick(e) {
+                const clickedCard = e.target.closest('.card');
+                if (!clickedCard || clickedCard.classList.contains('disappear')) {
+                    return; // Ignore clicks if not on a card or if card is disappearing
+                }
+
+                const type = clickedCard.dataset.type;
+
+                if (type === 'negated') {
+                    if (selectedNegated) {
+                        selectedNegated.classList.remove('selected');
+                    }
+                    selectedNegated = clickedCard;
+                    selectedNegated.classList.add('selected');
+                } else if (type === 'equivalent') {
+                    if (selectedEquivalent) {
+                        selectedEquivalent.classList.remove('selected');
+                    }
+                    selectedEquivalent = clickedCard;
+                    selectedEquivalent.classList.add('selected');
+                }
+
+                // If one of each type is selected, check for a match
+                if (selectedNegated && selectedEquivalent) {
+                    checkForMatch();
+                }
+            }
+            
+            /**
+             * Checks if the selected cards are a match.
+             */
+            function checkForMatch() {
+                const isMatch = selectedNegated.dataset.pairId === selectedEquivalent.dataset.pairId;
+                
+                if (isMatch) {
+                    handleCorrectMatch();
+                } else {
+                    handleIncorrectMatch();
+                }
+            }
+
+            /**
+             * Handles the logic for a correct pair selection.
+             */
+            function handleCorrectMatch() {
+                const card1 = selectedNegated;
+                const card2 = selectedEquivalent;
+                
+                card1.classList.remove('selected');
+                card2.classList.remove('selected');
+                
+                card1.classList.add('disappear');
+                card2.classList.add('disappear');
+
+                // Clean up selections
+                selectedNegated = null;
+                selectedEquivalent = null;
+                
+                remainingPairs--;
+                
+                // Remove the elements from the DOM after the animation
+                setTimeout(() => {
+                    card1.remove();
+                    card2.remove();
+                    // Check for win condition
+                    if (remainingPairs === 0) {
+                        winModal.classList.remove('hidden');
+                    }
+                }, 500);
+            }
+
+            /**
+             * Handles the logic for an incorrect pair selection.
+             */
+            function handleIncorrectMatch() {
+                 const card1 = selectedNegated;
+                 const card2 = selectedEquivalent;
+                 
+                 // Add shake and red flash effect
+                 card1.classList.add('shake');
+                 card2.classList.add('shake');
+                 card1.style.backgroundColor = '#ef4444'; // red-500
+                 card2.style.backgroundColor = '#ef4444'; // red-500
+                 card1.style.color = 'white';
+                 card2.style.color = 'white';
+
+
+                // Remove selection and effects after a delay
+                setTimeout(() => {
+                    card1.classList.remove('selected', 'shake');
+                    card2.classList.remove('selected', 'shake');
+                    card1.style.backgroundColor = '';
+                    card2.style.backgroundColor = '';
+                    card1.style.color = '';
+                    card2.style.color = '';
+
+                    // Reset selections
+                    selectedNegated = null;
+                    selectedEquivalent = null;
+                }, 800);
+            }
+
+            // Event Listeners
+            gameContainer.addEventListener('click', handleCardClick);
+            playAgainBtn.addEventListener('click', initGame);
+
+            // Initial game setup
+            initGame();
+        });
+    </script>
+
+</body>
+</html>
