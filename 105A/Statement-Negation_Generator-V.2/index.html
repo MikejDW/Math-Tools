@@ -4,10 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Analysis Statement Generator</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- This is the key change: We are now loading the CSS file from your 'libs' folder -->
+    <link rel="stylesheet" href="../libs/tailwind.css">
+    
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     
-    <!-- Load and configure MathJax -->
+    <!--
+      We still need this small script to configure MathJax before it loads.
+    -->
     <script>
         window.MathJax = {
             tex: {
@@ -19,7 +24,12 @@
             }
         };
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" id="MathJax-script" async></script>
+
+    <!-- 
+      And here is the other key change: Loading the main MathJax library
+      from your 'libs' folder instead of an external CDN.
+    -->
+    <script src="../libs/mathjax.js" id="MathJax-script" async></script>
 
     <style>
         body {
@@ -278,3 +288,4 @@
     </script>
 </body>
 </html>
+
