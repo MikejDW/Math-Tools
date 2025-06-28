@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complex Mean Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+        }
+        #inputPathCanvas {
+            cursor: crosshair;
+            touch-action: none;
+        }
+        #inputMeansCanvas {
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-4xl text-center mb-6">
+        <h1 class="text-3xl md:text-4xl font-bold text-white">Complex Mean Visualizer (Integral Method)</h1>
+        <p class="text-gray-400 mt-2">Draw a shape on the canvas. The arithmetic, geometric, and harmonic means of the curve will be plotted.</p>
+    </div>
+
+    <div class="w-full max-w-4xl mb-4">
+        <!-- Input Canvas Container -->
+        <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+            <h2 class="text-xl font-semibold text-center mb-2 text-white">Drawing Canvas (z-plane)</h2>
+            <div class="relative w-full" style="padding-top: 75%;"> 
+                <canvas id="inputPathCanvas" class="absolute top-0 left-0 w-full h-full bg-white rounded-md"></canvas>
+                <canvas id="inputMeansCanvas" class="absolute top-0 left-0 w-full h-full rounded-md"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex items-center space-x-4">
+        <button id="clearButton" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75 transition-colors">
+            Clear
+        </button>
+        <div class="flex items-center space-x-2">
+             <label for="scaleSlider" class="font-medium text-gray-300">Input Scale:</label>
+             <input id="scaleSlider" type="range" min="10" max="100" value="40" class="w-32">
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Element Selection ---
+        const inputPathCanvas = document.getElementById('inputPathCanvas');
+        const inputMeansCanvas = document.getElementById('inputMeansCanvas');
+
+        const inputPathCtx = inputPathCanvas.getContext('2d');
+        const inputMeansCtx = inputMeansCanvas.getContext('2d');
+
+        const clearButton = document.getElementById('clearButton');
+        const scaleSlider = document.getElementById('scaleSlider');
+
+        // --- State Variables ---
+        let isDrawing = false;
+        let lastZ; // Stores the last complex point {real, imag}
+        let inputScale = scaleSlider.value;
+        let curveSegments = []; // Stores {midpointZ, midpointW, length} for each segment
+        let totalArcLength = 0;
+
+        // --- Canvas Setup and Resizing ---
+        function setupCanvases() {
+            const dpr = window.devicePixelRatio || 1;
+            const rect = inputPathCanvas.getBoundingClientRect();
+            const canvases = [inputPathCanvas, inputMeansCanvas];
+            canvases.forEach(canvas => {
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+                canvas.getContext('2d').scale(dpr, dpr);
+            });
+            clearAndDrawAxes();
+        }
+
+        function clearAndDrawAxes() {
+            const canvases = [inputPathCanvas, inputMeansCanvas];
+            canvases.forEach(canvas => canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height));
+            const { width, height } = inputPathCanvas.getBoundingClientRect();
+            drawAxes(inputPathCtx, width, height, 'Re(z)', 'Im(z)');
+            curveSegments = [];
+            totalArcLength = 0;
+        }
+
+        function drawAxes(ctx, w, h, xLabel, yLabel) {
+            ctx.save();
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = 1;
+            ctx.font = '12px Inter';
+            ctx.fillStyle = '#888';
+            ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
+            ctx.fillText(xLabel, w - 35, h / 2 - 5);
+            ctx.beginPath(); ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, h); ctx.stroke();
+            ctx.fillText(yLabel, w / 2 + 5, 12);
+            ctx.restore();
+        }
+
+        function draw(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            const rect = inputPathCanvas.getBoundingClientRect();
+            const currentInputX = (e.clientX || e.touches[0].clientX) - rect.left;
+            const currentInputY = (e.clientY || e.touches[0].clientY) - rect.top;
+
+            const currentZ = {
+                real: (currentInputX - rect.width / 2) / inputScale,
+                imag: (rect.height / 2 - currentInputY) / inputScale,
+            };
+
+            if (lastZ) {
+                const segmentLength = Math.hypot(currentZ.real - lastZ.real, currentZ.imag - lastZ.imag);
+                if (segmentLength > 1e-6) {
+                    totalArcLength += segmentLength;
+                    const midpointZ = {
+                        real: (currentZ.real + lastZ.real) / 2,
+                        imag: (currentZ.imag + lastZ.imag) / 2
+                    };
+                    const midpointMag = Math.hypot(midpointZ.real, midpointZ.imag);
+                    let midpointW = null;
+                    if (midpointMag > 1e-9) {
+                        midpointW = {
+                            real: Math.log(midpointMag),
+                            imag: Math.atan2(midpointZ.imag, midpointZ.real)
+                        };
+                    }
+                    curveSegments.push({ midpointZ, midpointW, length: segmentLength });
+                    
+                    // Drawing logic
+                    const lastInputX = (lastZ.real * inputScale) + rect.width / 2;
+                    const lastInputY = (rect.height / 2) - (lastZ.imag * inputScale);
+                    drawPathSegment(inputPathCtx, lastInputX, lastInputY, currentInputX, currentInputY, '#007BFF');
+                }
+            }
+            lastZ = currentZ;
+            calculateAndDrawMeans();
+        }
+        
+        function drawPathSegment(ctx, fromX, fromY, toX, toY, color) {
+            ctx.strokeStyle = color; ctx.lineWidth = 4; ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.moveTo(fromX, fromY); ctx.lineTo(toX, toY); ctx.stroke();
+        }
+
+        function calculateAndDrawMeans() {
+            if (totalArcLength === 0) return;
+
+            // --- Integral Approximations ---
+            let weightedSumZ = { real: 0, imag: 0 };
+            let weightedSumW = { real: 0, imag: 0 };
+            let weightedSumInvZ = { real: 0, imag: 0 };
+
+            for (const seg of curveSegments) {
+                // Arithmetic
+                weightedSumZ.real += seg.midpointZ.real * seg.length;
+                weightedSumZ.imag += seg.midpointZ.imag * seg.length;
+                // Geometric
+                if (seg.midpointW) {
+                    weightedSumW.real += seg.midpointW.real * seg.length;
+                    weightedSumW.imag += seg.midpointW.imag * seg.length;
+                }
+                // Harmonic
+                const midZ_mag_sq = seg.midpointZ.real**2 + seg.midpointZ.imag**2;
+                if (midZ_mag_sq > 1e-9) {
+                    weightedSumInvZ.real += (seg.midpointZ.real / midZ_mag_sq) * seg.length;
+                    weightedSumInvZ.imag -= (seg.midpointZ.imag / midZ_mag_sq) * seg.length;
+                }
+            }
+
+            // --- Final Mean Calculations ---
+            const am_z = { real: weightedSumZ.real / totalArcLength, imag: weightedSumZ.imag / totalArcLength };
+
+            const avg_w = { real: weightedSumW.real / totalArcLength, imag: weightedSumW.imag / totalArcLength };
+            const gm_mag = Math.exp(avg_w.real);
+            const gm_z = { real: gm_mag * Math.cos(avg_w.imag), imag: gm_mag * Math.sin(avg_w.imag) };
+            
+            const avg_inv_z = { real: weightedSumInvZ.real / totalArcLength, imag: weightedSumInvZ.imag / totalArcLength };
+            const avg_inv_z_mag_sq = avg_inv_z.real**2 + avg_inv_z.imag**2;
+            let hm_z = {real: 0, imag: 0};
+            if (avg_inv_z_mag_sq > 1e-9) {
+                hm_z = {
+                    real: avg_inv_z.real / avg_inv_z_mag_sq,
+                    imag: -avg_inv_z.imag / avg_inv_z_mag_sq
+                };
+            }
+
+            // --- Draw everything ---
+            const iRect = inputMeansCanvas.getBoundingClientRect();
+            inputMeansCtx.clearRect(0, 0, iRect.width, iRect.height);
+            plotMeanZ(inputMeansCtx, am_z, 'orangered', 'AM', iRect, inputScale);
+            plotMeanZ(inputMeansCtx, gm_z, 'darkviolet', 'GM', iRect, inputScale);
+            plotMeanZ(inputMeansCtx, hm_z, '#00CED1', 'HM', iRect, inputScale);
+        }
+
+        function plotMeanZ(ctx, point, color, label, rect, scale) {
+            const canvasX = (rect.width / 2) + (point.real * scale);
+            const canvasY = (rect.height / 2) - (point.imag * scale);
+            drawDot(ctx, canvasX, canvasY, color, label);
+        }
+        
+        function drawDot(ctx, x, y, color, label){
+            if (!isFinite(x) || !isFinite(y)) return;
+            ctx.beginPath(); ctx.arc(x, y, 6, 0, 2 * Math.PI);
+            ctx.fillStyle = color; ctx.fill();
+            ctx.strokeStyle = 'white'; ctx.lineWidth = 1.5; ctx.stroke();
+            ctx.font = 'bold 12px Inter'; ctx.fillStyle = color;
+            ctx.fillText(label, x + 10, y + 4);
+        }
+
+        function startDrawing(e) {
+            isDrawing = true;
+            draw(e);
+        }
+
+        function stopDrawing() {
+            isDrawing = false;
+            lastZ = undefined;
+        }
+
+        // --- Event Listeners ---
+        inputPathCanvas.addEventListener('mousedown', startDrawing);
+        inputPathCanvas.addEventListener('mousemove', draw);
+        window.addEventListener('mouseup', stopDrawing);
+        inputPathCanvas.addEventListener('touchstart', startDrawing);
+        inputPathCanvas.addEventListener('touchmove', draw);
+        window.addEventListener('touchend', stopDrawing);
+        window.addEventListener('touchcancel', stopDrawing);
+        clearButton.addEventListener('click', clearAndDrawAxes);
+        scaleSlider.addEventListener('input', (e) => { inputScale = e.target.value; });
+        window.addEventListener('resize', setupCanvases);
+
+        // --- Initial Call ---
+        setTimeout(setupCanvases, 50);
+
+    </script>
+</body>
+</html>
