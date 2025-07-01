@@ -28,8 +28,9 @@
     <!-- 
       And here is the other key change: Loading the main MathJax library
       from your 'libs' folder instead of an external CDN.
+      Changed 'async' to 'defer' to fix loading order issues.
     -->
-    <script src="../libs/mathjax.js" id="MathJax-script" async></script>
+    <script src="../libs/mathjax.js" id="MathJax-script" defer></script>
 
     <style>
         body {
@@ -217,7 +218,7 @@
                 toggleViewBtn.textContent = isEnglishView ? 'Show Symbolic' : 'Show in English';
 
                 // Always re-typeset the math content
-                if (window.MathJax) {
+                if (window.MathJax && MathJax.typesetPromise) {
                     MathJax.typesetPromise([statementContainer, negationStepsContainer]).catch((err) => console.log(err.message));
                 }
             }
@@ -276,16 +277,20 @@
             }
 
             // --- Main Execution ---
-            MathJax.startup.promise.then(() => {
-                generateBtn.addEventListener('click', generateNewProblem);
-                toggleViewBtn.addEventListener('click', handleToggleView);
-                revealBtn.addEventListener('click', handleRevealNegation);
-                nextStepBtn.addEventListener('click', handleNextStep);
-                
-                generateNewProblem();
-            });
+            // This waits until MathJax is fully loaded and ready before running the app logic.
+            if (window.MathJax) {
+                 MathJax.startup.promise.then(() => {
+                    generateBtn.addEventListener('click', generateNewProblem);
+                    toggleViewBtn.addEventListener('click', handleToggleView);
+                    revealBtn.addEventListener('click', handleRevealNegation);
+                    nextStepBtn.addEventListener('click', handleNextStep);
+                    
+                    generateNewProblem();
+                });
+            }
         });
     </script>
 </body>
 </html>
+
 
