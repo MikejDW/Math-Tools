@@ -6,10 +6,21 @@
     <title>Bare-Bones Analysis Generator</title>
     
     <script>
+        // This configuration object now includes a 'startup' section.
+        // The 'ready' function inside it is the official callback that MathJax
+        // will execute as soon as it is fully loaded and ready to be used.
         window.MathJax = {
             tex: {
                 inlineMath: [['$', '$'], ['\\(', '\\)']],
                 displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            },
+            startup: {
+                ready: () => {
+                    // This line is important for MathJax's internal processes.
+                    MathJax.startup.defaultReady();
+                    // Now that MathJax is ready, we can safely run our application's code.
+                    runApp();
+                }
             }
         };
     </script>
@@ -77,6 +88,8 @@
     </div>
 
     <script>
+        // We define our entire application inside this function.
+        // It will only be called by the MathJax 'ready' function once everything is loaded.
         function runApp() {
             const statementBox = document.getElementById('statement-box');
             const generateBtn = document.getElementById('generate-btn');
@@ -113,17 +126,18 @@
                 const latexString = template(params);
                 statementBox.innerHTML = `$$${latexString}$$`;
 
-                // Re-render the math
+                // Re-render the math. This is now safe to call.
                 if (window.MathJax && MathJax.typesetPromise) {
                     MathJax.typesetPromise([statementBox]).catch((err) => console.log(err.message));
                 }
             }
 
             // --- Main Execution ---
-            window.MathJax.startup.promise.then(() => {
-                generateBtn.addEventListener('click', generateNewStatement);
-                generateNewStatement(); // Generate one on initial load
-            });
+            // We no longer need to wait for any other events or promises here.
+            generateBtn.addEventListener('click', generateNewStatement);
+            generateNewStatement(); // Generate one on initial load
         }
+    </script>
 
-        document.addEventListener('DOMContentLoaded', runApp);
+</body>
+</html>
