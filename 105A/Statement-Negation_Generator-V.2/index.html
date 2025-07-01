@@ -28,9 +28,8 @@
     <!-- 
       And here is the other key change: Loading the main MathJax library
       from your 'libs' folder instead of an external CDN.
-      Changed 'async' to 'defer' to fix loading order issues.
     -->
-    <script src="../libs/mathjax.js" id="MathJax-script" defer></script>
+    <script src="../libs/mathjax.js" id="MathJax-script" async></script>
 
     <style>
         body {
@@ -81,7 +80,8 @@
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
+        // This function contains all of our application's logic.
+        function runApp() {
             // DOM Elements
             const statementContainer = document.getElementById('statement-container');
             const negationContainer = document.getElementById('negation-container');
@@ -275,22 +275,23 @@
                 isEnglishView = !isEnglishView;
                 updateDisplay();
             }
-
+            
             // --- Main Execution ---
-            // This waits until MathJax is fully loaded and ready before running the app logic.
-            if (window.MathJax) {
-                 MathJax.startup.promise.then(() => {
-                    generateBtn.addEventListener('click', generateNewProblem);
-                    toggleViewBtn.addEventListener('click', handleToggleView);
-                    revealBtn.addEventListener('click', handleRevealNegation);
-                    nextStepBtn.addEventListener('click', handleNextStep);
-                    
-                    generateNewProblem();
-                });
-            }
-        });
+            // This is the most robust way to ensure our code runs AFTER MathJax is ready.
+            window.MathJax.startup.promise.then(() => {
+                generateBtn.addEventListener('click', generateNewProblem);
+                toggleViewBtn.addEventListener('click', handleToggleView);
+                revealBtn.addEventListener('click', handleRevealNegation);
+                nextStepBtn.addEventListener('click', handleNextStep);
+                
+                // Initial problem generation
+                generateNewProblem();
+            });
+        }
+
+        // We wrap our entire application in a function and only call it
+        // once the DOM is loaded.
+        document.addEventListener('DOMContentLoaded', runApp);
     </script>
 </body>
 </html>
-
-
