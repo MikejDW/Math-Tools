@@ -3,294 +3,127 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Analysis Statement Generator</title>
+    <title>Bare-Bones Analysis Generator</title>
     
-    <!-- This is the key change: We are now loading the CSS file from your 'libs' folder -->
-    <link rel="stylesheet" href="../libs/tailwind.css">
-    
-    <!--
-      We still need this small script to configure MathJax before it loads.
-    -->
     <script>
         window.MathJax = {
             tex: {
                 inlineMath: [['$', '$'], ['\\(', '\\)']],
                 displayMath: [['$$', '$$'], ['\\[', '\\]']]
-            },
-            svg: {
-                fontCache: 'global'
             }
         };
     </script>
-
-    <!-- 
-      And here is the other key change: Loading the main MathJax library
-      from your 'libs' folder instead of an external CDN.
-    -->
     <script src="../libs/mathjax.js" id="MathJax-script" async></script>
 
     <style>
-        /* Using a standard system font stack for maximum compatibility */
+        /* Minimalist styling to avoid external dependencies */
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+            font-family: sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
         }
-        /* Ensure the containers have a minimum height to prevent layout shifts */
-        #statement-container, #negation-steps-container {
-            min-height: 120px;
+        .container {
+            text-align: center;
+            background-color: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            max-width: 800px;
+            width: 100%;
+        }
+        #statement-box {
+            border: 1px solid #ddd;
+            background-color: #fafafa;
+            min-height: 150px;
+            padding: 20px;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5em;
+            overflow-x: auto;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1em;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
         }
     </style>
 </head>
-<body class="bg-gray-100 dark:bg-gray-900 flex items-center justify-center min-h-screen p-4">
+<body>
 
-    <div class="w-full max-w-4xl mx-auto text-center">
-        <header class="mb-8">
-            <h1 class="text-4xl font-bold text-gray-800 dark:text-white">Analysis Definition Generator</h1>
-            <p class="text-lg text-gray-600 dark:text-gray-300 mt-2">Generate a random definition, reveal its negation, and toggle between symbolic and English views.</p>
-        </header>
-
-        <!-- Container for the generated statement -->
-        <div id="statement-container" class="bg-white dark:bg-gray-600 rounded-lg shadow-xl p-6 md:p-8 min-h-[150px] flex items-center justify-center text-xl md:text-2xl mb-4 overflow-x-auto">
+    <div class="container">
+        <h1>Bare-Bones Analysis Generator</h1>
+        <p>Click the button to generate a new symbolic statement.</p>
+        <div id="statement-box">
             <!-- Statement will be injected here -->
         </div>
-
-        <!-- Negation Steps Container -->
-        <div id="negation-container" class="hidden">
-            <h2 class="text-2xl font-semibold text-gray-700 dark:text-gray-200 mb-2">Negation Steps:</h2>
-            <div id="negation-steps-container" class="bg-gray-100 dark:bg-gray-700 rounded-lg shadow-inner p-6 md:p-8 flex items-center justify-center text-xl md:text-2xl mb-4 overflow-x-auto">
-                <!-- Negation steps will appear here -->
-            </div>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="flex flex-wrap justify-center gap-4">
-             <button id="generate-btn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition transform hover:scale-105">
-                Generate New Problem
-            </button>
-            <button id="toggle-view-btn" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition transform hover:scale-105">
-                Show in English
-            </button>
-            <button id="reveal-negation-btn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition transform hover:scale-105">
-                Reveal Negation
-            </button>
-            <button id="next-step-btn" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition transform hover:scale-105 hidden">
-                Next Step
-            </button>
-        </div>
+        <button id="generate-btn">Generate New Statement</button>
     </div>
 
     <script>
-        // This function contains all of our application's logic.
         function runApp() {
-            // DOM Elements
-            const statementContainer = document.getElementById('statement-container');
-            const negationContainer = document.getElementById('negation-container');
-            const negationStepsContainer = document.getElementById('negation-steps-container');
+            const statementBox = document.getElementById('statement-box');
             const generateBtn = document.getElementById('generate-btn');
-            const toggleViewBtn = document.getElementById('toggle-view-btn');
-            const revealBtn = document.getElementById('reveal-negation-btn');
-            const nextStepBtn = document.getElementById('next-step-btn');
 
-            // State
-            let currentTemplate = null;
-            let currentParams = null;
-            let negationStep = 0;
-            let isEnglishView = false;
-            
-            // --- Pools of variables ---
-            const epsilons = ['\\epsilon', '\\delta', '\\gamma'];
-            const deltas = ['\\delta', '\\gamma', '\\eta'];
-            const indices = ['N', 'M', 'K'];
-            const variables = ['x', 'y', 'z'];
-            const points = ['c', 'a', 'p'];
-            const functions = ['f', 'g', 'h'];
-            const sequences = ['a_n', 'b_n', 'x_n'];
-            const limits = ['L', 'A', 'B'];
-
-            // --- Statement Templates with Symbolic and English versions ---
             const templates = [
-                {
-                    name: "Limit of a Sequence",
-                    symbolic: {
-                        template: (p) => `\\forall ${p.epsilon} > 0, \\exists ${p.index} \\in \\mathbb{N} \\text{ s.t. } \\forall n \\geq ${p.index}, |${p.sequence} - ${p.limit}| < ${p.epsilon}`,
-                        negation: (p) => [
-                            `\\neg \\left( \\forall ${p.epsilon} > 0, \\exists ${p.index} \\in \\mathbb{N} \\text{ s.t. } \\forall n \\geq ${p.index}, |${p.sequence} - ${p.limit}| < ${p.epsilon} \\right)`,
-                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\neg \\left( \\exists ${p.index} \\in \\mathbb{N} \\text{ s.t. } \\forall n \\geq ${p.index}, |${p.sequence} - ${p.limit}| < ${p.epsilon} \\right)`,
-                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\forall ${p.index} \\in \\mathbb{N}, \\neg \\left( \\forall n \\geq ${p.index}, |${p.sequence} - ${p.limit}| < ${p.epsilon} \\right)`,
-                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\forall ${p.index} \\in \\mathbb{N}, \\exists n \\geq ${p.index} \\text{ s.t. } \\neg \\left( |${p.sequence} - ${p.limit}| < ${p.epsilon} \\right)`,
-                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\forall ${p.index} \\in \\mathbb{N}, \\exists n \\geq ${p.index} \\text{ s.t. } |${p.sequence} - ${p.limit}| \\geq ${p.epsilon}`
-                        ]
-                    },
-                    english: {
-                        template: (p) => `For every $${p.epsilon} > 0$, there exists a natural number $${p.index} \\in \\mathbb{N}$ such that for all $n \\geq ${p.index}$, $|${p.sequence} - ${p.limit}| < ${p.epsilon}$.`,
-                        negation: (p) => [
-                            `It is not the case that (for every $${p.epsilon} > 0$, there exists a natural number $${p.index} \\in \\mathbb{N}$ such that for all $n \\geq ${p.index}$, $|${p.sequence} - ${p.limit}| < ${p.epsilon}$).`,
-                            `There exists an $${p.epsilon} > 0$ such that it is not the case that (there exists a natural number $${p.index} \\in \\mathbb{N}$ such that for all $n \\geq ${p.index}$, $|${p.sequence} - ${p.limit}| < ${p.epsilon}$).`,
-                            `There exists an $${p.epsilon} > 0$ such that for all natural numbers $${p.index} \\in \\mathbb{N}$, it is not the case that (for all $n \\geq ${p.index}$, $|${p.sequence} - ${p.limit}| < ${p.epsilon}$).`,
-                            `There exists an $${p.epsilon} > 0$ such that for all natural numbers $${p.index} \\in \\mathbb{N}$, there exists an $n \\geq ${p.index}$ such that it is not the case that ($|${p.sequence} - ${p.limit}| < ${p.epsilon}$).`,
-                            `There exists an $${p.epsilon} > 0$ such that for all natural numbers $${p.index} \\in \\mathbb{N}$, there exists an $n \\geq ${p.index}$ such that $|${p.sequence} - ${p.limit}| \\geq ${p.epsilon}$.`
-                        ]
-                    }
-                },
-                {
-                    name: "Continuity at a Point",
-                    symbolic: {
-                        template: (p) => `\\forall ${p.epsilon} > 0, \\exists ${p.delta} > 0 \\text{ s.t. } \\forall ${p.variable}, |${p.variable} - ${p.point}| < ${p.delta} \\implies |${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon}`,
-                        negation: (p) => [
-                            `\\neg \\left( \\forall ${p.epsilon} > 0, \\exists ${p.delta} > 0 \\text{ s.t. } \\forall ${p.variable}, |${p.variable} - ${p.point}| < ${p.delta} \\implies |${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon} \\right)`,
-                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\neg \\left( \\exists ${p.delta} > 0 \\text{ s.t. } \\forall ${p.variable}, |${p.variable} - ${p.point}| < ${p.delta} \\implies |${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon} \\right)`,
-                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\forall ${p.delta} > 0, \\neg \\left( \\forall ${p.variable}, |${p.variable} - ${p.point}| < ${p.delta} \\implies |${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon} \\right)`,
-                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\forall ${p.delta} > 0, \\exists ${p.variable} \\text{ s.t. } \\neg \\left( |${p.variable} - ${p.point}| < ${p.delta} \\implies |${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon} \\right)`,
-                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\forall ${p.delta} > 0, \\exists ${p.variable} \\text{ s.t. } |${p.variable} - ${p.point}| < ${p.delta} \\land \\neg \\left( |${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon} \\right)`,
-                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\forall ${p.delta} > 0, \\exists ${p.variable} \\text{ s.t. } |${p.variable} - ${p.point}| < ${p.delta} \\land |${p.func}(${p.variable}) - ${p.func}(${p.point})| \\geq ${p.epsilon}`
-                        ]
-                    },
-                    english: {
-                        template: (p) => `For every $${p.epsilon} > 0$, there exists a $${p.delta} > 0$ such that for all $${p.variable}$, if $|${p.variable} - ${p.point}| < ${p.delta}$ then $|${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon}$.`,
-                        negation: (p) => [
-                            `It is not the case that (for every $${p.epsilon} > 0$, there exists a $${p.delta} > 0$ such that for all $${p.variable}$, if $|${p.variable} - ${p.point}| < ${p.delta}$ then $|${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon}$).`,
-                            `There exists an $${p.epsilon} > 0$ such that it is not the case that (there exists a $${p.delta} > 0$ such that for all $${p.variable}$, if $|${p.variable} - ${p.point}| < ${p.delta}$ then $|${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon}$).`,
-                            `There exists an $${p.epsilon} > 0$ such that for all $${p.delta} > 0$, it is not the case that (for all $${p.variable}$, if $|${p.variable} - ${p.point}| < ${p.delta}$ then $|${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon}$).`,
-                            `There exists an $${p.epsilon} > 0$ such that for all $${p.delta} > 0$, there exists an $${p.variable}$ such that it is not the case that (if $|${p.variable} - ${p.point}| < ${p.delta}$ then $|${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon}$).`,
-                            `There exists an $${p.epsilon} > 0$ such that for all $${p.delta} > 0$, there exists an $${p.variable}$ such that $|${p.variable} - ${p.point}| < ${p.delta}$ and it is not the case that ($|${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon}$).`,
-                            `There exists an $${p.epsilon} > 0$ such that for all $${p.delta} > 0$, there exists an $${p.variable}$ such that $|${p.variable} - ${p.point}| < ${p.delta}$ and $|${p.func}(${p.variable}) - ${p.func}(${p.point})| \\geq ${p.epsilon}$.`
-                        ]
-                    }
-                },
-                {
-                    name: "Uniform Continuity",
-                    symbolic: {
-                        template: (p) => `\\forall ${p.epsilon} > 0, \\exists ${p.delta} > 0 \\text{ s.t. } \\forall ${p.var1}, ${p.var2}, |${p.var1} - ${p.var2}| < ${p.delta} \\implies |${p.func}(${p.var1}) - ${p.func}(${p.var2})| < ${p.epsilon}`,
-                        negation: (p) => [
-                            `\\neg \\left( \\forall ${p.epsilon} > 0, \\exists ${p.delta} > 0 \\text{ s.t. } \\forall ${p.var1}, ${p.var2}, |${p.var1} - ${p.var2}| < ${p.delta} \\implies |${p.func}(${p.var1}) - ${p.func}(${p.var2})| < ${p.epsilon} \\right)`,
-                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\neg \\left( \\exists ${p.delta} > 0 \\text{ s.t. } \\forall ${p.var1}, ${p.var2}, |${p.var1} - ${p.var2}| < ${p.delta} \\implies |${p.func}(${p.var1}) - ${p.func}(${p.var2})| < ${p.epsilon} \\right)`,
-                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\forall ${p.delta} > 0, \\neg \\left( \\forall ${p.var1}, ${p.var2}, |${p.var1} - ${p.var2}| < ${p.delta} \\implies |${p.func}(${p.var1}) - ${p.func}(${p.var2})| < ${p.epsilon} \\right)`,
-                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\forall ${p.delta} > 0, \\exists ${p.var1}, ${p.var2} \\text{ s.t. } \\neg \\left( |${p.var1} - ${p.var2}| < ${p.delta} \\implies |${p.func}(${p.var1}) - ${p.func}(${p.var2})| < ${p.epsilon} \\right)`,
-                            `\\exists ${p.epsilon} > 0 \\text{ s.t. } \\forall ${p.delta} > 0, \\exists ${p.var1}, ${p.var2} \\text{ s.t. } |${p.var1} - ${p.var2}| < ${p.delta} \\land |${p.func}(${p.var1}) - ${p.func}(${p.var2})| \\geq ${p.epsilon}`
-                        ]
-                    },
-                    english: {
-                        template: (p) => `For every $${p.epsilon} > 0$, there exists a $${p.delta} > 0$ such that for all $${p.var1}, ${p.var2}$, if $|${p.var1} - ${p.var2}| < ${p.delta}$ then $|${p.func}(${p.var1}) - ${p.func}(${p.var2})| < ${p.epsilon}$.`,
-                        negation: (p) => [
-                            `It is not the case that (for every $${p.epsilon} > 0$, there exists a $${p.delta} > 0$ such that for all $${p.var1}, ${p.var2}$, if $|${p.var1} - ${p.var2}| < ${p.delta}$ then $|${p.func}(${p.var1}) - ${p.func}(${p.var2})| < ${p.epsilon}$).`,
-                            `There exists an $${p.epsilon} > 0$ such that it is not the case that (there exists a $${p.delta} > 0$ such that for all $${p.var1}, ${p.var2}$, if $|${p.var1} - ${p.var2}| < ${p.delta}$ then $|${p.func}(${p.var1}) - ${p.func}(${p.var2})| < ${p.epsilon}$).`,
-                            `There exists an $${p.epsilon} > 0$ such that for all $${p.delta} > 0$, it is not the case that (for all $${p.var1}, ${p.var2}$, if $|${p.var1} - ${p.var2}| < ${p.delta}$ then $|${p.func}(${p.var1}) - ${p.func}(${p.var2})| < ${p.epsilon}$).`,
-                            `There exists an $${p.epsilon} > 0$ such that for all $${p.delta} > 0$, there exist $${p.var1}, ${p.var2}$ such that it is not the case that (if $|${p.var1} - ${p.var2}| < ${p.delta}$ then $|${p.func}(${p.var1}) - ${p.func}(${p.var2})| < ${p.epsilon}$).`,
-                            `There exists an $${p.epsilon} > 0$ such that for all $${p.delta} > 0$, there exist $${p.var1}, ${p.var2}$ such that $|${p.var1} - ${p.var2}| < ${p.delta}$ and $|${p.func}(${p.var1}) - ${p.func}(${p.var2})| \\geq ${p.epsilon}$.`
-                        ]
-                    }
-                }
+                (p) => `\\forall ${p.epsilon} > 0, \\exists ${p.index} \\in \\mathbb{N} \\text{ s.t. } \\forall n \\geq ${p.index}, |${p.sequence} - ${p.limit}| < ${p.epsilon}`,
+                (p) => `\\forall ${p.epsilon} > 0, \\exists ${p.delta} > 0 \\text{ s.t. } \\forall ${p.variable}, |${p.variable} - ${p.point}| < ${p.delta} \\implies |${p.func}(${p.variable}) - ${p.func}(${p.point})| < ${p.epsilon}`
             ];
 
+            const epsilons = ['\\epsilon', '\\delta'];
+            const deltas = ['\\delta', '\\gamma'];
+            const indices = ['N', 'K'];
+            const variables = ['x', 'y'];
+            const points = ['c', 'a'];
+            const functions = ['f', 'g'];
+            const sequences = ['a_n', 'x_n'];
+            const limits = ['L', 'A'];
+
             const choice = (arr) => arr[Math.floor(Math.random() * arr.length)];
-            
-            function updateDisplay() {
-                if (!currentTemplate) return;
 
-                const viewMode = isEnglishView ? 'english' : 'symbolic';
-                
-                // Helper function to apply styles and content
-                const updateContainer = (container, text) => {
-                    if (isEnglishView) {
-                        container.innerHTML = `<p>${text}</p>`;
-                        container.classList.add('justify-start', 'text-left');
-                        container.classList.remove('justify-center', 'text-center');
-                    } else {
-                        container.innerHTML = `$$${text}$$`;
-                        container.classList.remove('justify-start', 'text-left');
-                        container.classList.add('justify-center', 'text-center');
-                    }
-                };
-
-                // Update main statement
-                const statementText = currentTemplate[viewMode].template(currentParams);
-                updateContainer(statementContainer, statementText);
-
-                // Update negation statement if visible
-                if (!negationContainer.classList.contains('hidden')) {
-                    const negationSteps = currentTemplate[viewMode].negation(currentParams);
-                    if (negationStep < negationSteps.length) {
-                        const stepText = negationSteps[negationStep];
-                        updateContainer(negationStepsContainer, stepText);
-                    }
-                }
-                
-                toggleViewBtn.textContent = isEnglishView ? 'Show Symbolic' : 'Show in English';
-
-                // Always re-typeset the math content
-                if (window.MathJax && MathJax.typesetPromise) {
-                    MathJax.typesetPromise([statementContainer, negationStepsContainer]).catch((err) => console.log(err.message));
-                }
-            }
-
-
-            function generateNewProblem() {
-                currentTemplate = choice(templates);
-                const var1_choice = choice(variables);
-                currentParams = {
+            function generateNewStatement() {
+                const template = choice(templates);
+                const params = {
                     epsilon: choice(epsilons),
                     delta: choice(deltas),
                     index: choice(indices),
                     variable: choice(variables),
-                    var1: var1_choice,
-                    var2: choice(variables.filter(v => v !== var1_choice)),
                     point: choice(points),
                     func: choice(functions),
                     sequence: choice(sequences),
                     limit: choice(limits)
                 };
-
-                negationStep = 0;
-                negationContainer.classList.add('hidden');
-                negationStepsContainer.innerHTML = '';
-                revealBtn.classList.remove('hidden');
-                nextStepBtn.classList.add('hidden');
-                nextStepBtn.disabled = false;
-                nextStepBtn.textContent = 'Next Step';
                 
-                updateDisplay();
-            }
+                const latexString = template(params);
+                statementBox.innerHTML = `$$${latexString}$$`;
 
-            function handleRevealNegation() {
-                negationContainer.classList.remove('hidden');
-                revealBtn.classList.add('hidden');
-                nextStepBtn.classList.remove('hidden');
-                updateDisplay();
-            }
-
-            function handleNextStep() {
-                // Use symbolic length as the source of truth
-                const negationSteps = currentTemplate.symbolic.negation(currentParams);
-                if (negationStep < negationSteps.length - 1) {
-                    negationStep++;
-                    if (negationStep === negationSteps.length - 1) {
-                        nextStepBtn.textContent = 'Final Answer';
-                        nextStepBtn.disabled = true;
-                    }
+                // Re-render the math
+                if (window.MathJax && MathJax.typesetPromise) {
+                    MathJax.typesetPromise([statementBox]).catch((err) => console.log(err.message));
                 }
-                updateDisplay();
             }
 
-            function handleToggleView() {
-                isEnglishView = !isEnglishView;
-                updateDisplay();
-            }
-            
             // --- Main Execution ---
-            // This is the most robust way to ensure our code runs AFTER MathJax is ready.
             window.MathJax.startup.promise.then(() => {
-                generateBtn.addEventListener('click', generateNewProblem);
-                toggleViewBtn.addEventListener('click', handleToggleView);
-                revealBtn.addEventListener('click', handleRevealNegation);
-                nextStepBtn.addEventListener('click', handleNextStep);
-                
-                // Initial problem generation
-                generateNewProblem();
+                generateBtn.addEventListener('click', generateNewStatement);
+                generateNewStatement(); // Generate one on initial load
             });
         }
 
-        // We wrap our entire application in a function and only call it
-        // once the DOM is loaded.
         document.addEventListener('DOMContentLoaded', runApp);
-    </script>
-</body>
-</html>
