@@ -8,8 +8,6 @@
     <!-- This is the key change: We are now loading the CSS file from your 'libs' folder -->
     <link rel="stylesheet" href="../libs/tailwind.css">
     
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
-    
     <!--
       We still need this small script to configure MathJax before it loads.
     -->
@@ -32,8 +30,9 @@
     <script src="../libs/mathjax.js" id="MathJax-script" async></script>
 
     <style>
+        /* Using a standard system font stack for maximum compatibility */
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
         }
         /* Ensure the containers have a minimum height to prevent layout shifts */
         #statement-container, #negation-steps-container {
